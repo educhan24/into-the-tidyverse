@@ -31,12 +31,20 @@ incarceration <- here("Documents", "GitHub", "into-the-tidyverse", "Data", "inca
   read_csv()%>%
   select(state, year, total_jail_pop)%>%
   drop_na() %>%
-  state.name[match("state", state.abb)]%>%
+ # state.name[match("state", state.abb)]%>%
   filter(year=="2018")%>%
   group_by(state)%>%
-  summarise(total_jail_pop = sum(total_jail_pop)/1000)
+  summarise(jail_per_cap = sum(total_jail_pop)/1000)
+
+state_crosswalk <- tibble(state_name = state.name,
+                          state_abb = state.abb)
+state_crosswalk
 
 incarceration %>%
-  left_join(pop, by = "state")%>%
-  select(state, total_jail_pop, cases_per_pop)
-incarceration
+  inner_join(state_crosswalk, by = c("state"="state_abb"))%>%
+  inner_join(pop, by = c("state_name" = "state"))%>%
+  select(state, jail_per_cap, cases_per_pop)%>%
+  ggplot(mapping = aes(x=jail_per_cap, y=cases_per_pop, fill=state)) +
+  geom_area() +
+  theme(legend.position = "bottom")
+

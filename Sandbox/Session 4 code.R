@@ -232,106 +232,49 @@ covid%>%
 
 
 
-covidnew <- here("Documents", "GitHub", "into-the-tidyverse", "Data", "nst-est2019-modified.csv")%>%
-  read_csv()%>%
-  select(state=State, population2019 = "2019")%>%
-  mutate(population2019 = population2019/1000)
-
-covid <- here("Documents","GitHub","into-the-tidyverse", "Data", "time_series_covid19_confirmed_US.csv") %>%  
+covidcases <- here("Documents", "GitHub", "into-the-tidyverse", "Data", "time_series_covid19_confirmed_US.csv")%>%
   read_csv() %>%
-  clean_names() %>%
-  select(-c(uid:fips, country_region:combined_key))%>%
-  rename(county = admin2, state = province_state)%>%
-  pivot_longer(cols = -c(county, state), names_to = "date",
-               values_to = "cases")%>%
-  mutate(date = str_remove(date, "x"),
-         date = mdy(date))%>%
-  group_by(state, date) %>%
-  summarise(cases = sum(cases))%>%
-  ungroup()
-
-covid %>%
-  inner_join(covidnew) %>%
-  group_by(state)%>%
-  mutate(covidrates_per_capita = cases /population2019)%>%
-  ungroup()%>%
-  ggplot(mapping = aes(x = state, y = covidrates_per_capita)) +
-  geom_bar(stat="identity")+
-  ggtitle("Covid-19 cases per USA state capita")
-#or
-covid %>%
-  inner_join(covidnew) %>%
-  group_by(state)%>%
-  mutate(covidrates_per_capita = cases /population2019)%>%
-  ungroup()%>%
-  ggplot(mapping = aes(x = date, y = covidrates_per_capita, fill=state)) +
-  geom_area()+
-  theme(legend.position = "bottom") +
-  ggtitle("Covid-19 cases per USA state capita")
-#or
-covid %>%
-  inner_join(covidnew) %>%
-  group_by(state)%>%
-  mutate(covidrates_per_capita = cases /population2019)%>%
-  ungroup()%>%
-  ggplot(mapping = aes(x = date, y = covidrates_per_capita, color=state)) +
-  geom_bar(stat = "summary", fun = "mean")+
-  theme(legend.position = "bottom")
-  
-
- # state.name[match(incarceration,state.abb)]%>%
-
-#covid2 <- tibble(state_name = state.name,
-                 #    state_abb = state.abb,
-                    # state_region = state.region)
-
-covid2 <- here("Documents","GitHub","into-the-tidyverse", "Data", "time_series_covid19_confirmed_US.csv") %>%  
-  read_csv() %>%
-  clean_names() %>%
-  select(-c(uid:fips, country_region:combined_key))%>%
-  rename(county = admin2, state = province_state)%>%
-  pivot_longer(cols = -c(county, state), names_to = "date",
+  select(-c(UID:Admin2, Country_Region:Combined_Key))%>%
+  rename(state = Province_State)%>%
+  pivot_longer(cols = -c(state), names_to = "date",
                values_to = "cases")%>%
   mutate(date = str_remove(date, "x"),
          date = mdy(date))%>%
   group_by(state) %>%
   summarise(cases = sum(cases))%>%
   ungroup()
-covid2
+covidcases
 
-covidnew <- here("Documents", "GitHub", "into-the-tidyverse", "Data", "nst-est2019-modified.csv")%>%
+pop <- here("Documents", "GitHub", "into-the-tidyverse", "Data", "nst-est2019-modified.csv")%>%
   read_csv()%>%
-  select(state=State, population2019 = "2019")%>%
-  mutate(population2019 = population2019/1000)
-covidnew
-
-covid2 %>%
-  inner_join(covidnew, by=state)%>%
-  group_by(state)%>%
-  mutate(covidrates_per_capita = cases / population2019)%>%
   drop_na() %>%
-  select(state, covidrates_per_capita)%>%
+  select(state = State, population = "2019")%>%
+  mutate(population = population/1000)%>%
+  left_join(covidcases, by = "state")%>%
+  mutate(cases_per_pop = cases /  population)%>%
+  select(state, cases_per_pop)%>%
   ungroup()
 
-covid2 <- tibble(state_name = state.name,
-                     state_abb = state.abb,
-                     state_region = state.region)
-
-incarceration <- here("Documents", "GitHub", "into-the-tidyverse","Data","incarceration_trends.csv")%>%
+incarceration <- here("Documents", "GitHub", "into-the-tidyverse", "Data", "incarceration_trends.csv")%>%
   read_csv()%>%
-  group_by(state)%>%
+  select(state, year, total_jail_pop)%>%
+  drop_na() %>%
+  # state.name[match("state", state.abb)]%>%
   filter(year=="2018")%>%
-  summarise(jail_per_cap= sum(total_jail_pop/(total_pop/1000), na.rm = TRUE))%>%
-  left_join(covid2, by = c("state"="state_abb"))
-incarceration
+  group_by(state)%>%
+  summarise(jail_per_cap = sum(total_jail_pop)/1000)
 
-  select(state, jail_per_cap, covidrates_per_capita)%>%
-  ungroup()
-incarceration
+state_crosswalk <- tibble(state_name = state.name,
+                          state_abb = state.abb)
+state_crosswalk
 
-incarceration%>%
-  ggplot(mapping = aes(x=jail_per_cap, y=covidrates_per_capita,
-                       group=state))+
-  geom_line()
-  
+incarceration %>%
+  inner_join(state_crosswalk, by = c("state"="state_abb"))%>%
+  inner_join(pop, by = c("state_name" = "state"))%>%
+  select(state, jail_per_cap, cases_per_pop)%>%
+  ggplot(mapping = aes(x=jail_per_cap, y=cases_per_pop, fill=state)) +
+  geom_area() +
+  theme(legend.position = "bottom")
+
+
 
